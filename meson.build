@@ -117,6 +117,9 @@ link_language = get_option('link_language')
 if link_language != 'c'
   add_languages(link_language)
 endif
+if get_option('fuzzing_engine').startswith('-fsanitize=fuzzer')
+  add_project_arguments('-fsanitize=fuzzer-no-link', language : 'c')
+endif
 
 # use honggfuzz for parallel persistent fuzzing
 honggfuzz = find_program('honggfuzz', required: false)
