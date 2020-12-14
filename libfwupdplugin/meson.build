@@ -267,3 +267,52 @@ if get_option('tests')
 endif
 
 fwupdplugin_incdir = include_directories('.')
+
+if fuzzing_link_args != ''
+  eo = []
+else
+  lib = executable(
+    'fuzzer-main',
+    sources : 'fu-fuzzer-main.c',
+    dependencies : [
+      giounix,
+    ],
+  )
+  eo = lib.extract_objects('fu-fuzzer-main.c')
+  fuzzing_link_args = []
+endif
+
+executable(
+  'fu-dfu-firmware_fuzzer',
+  sources : [
+    'fu-dfu-firmware-fuzzer.c',
+  ],
+  include_directories : [
+    root_incdir,
+    fwupd_incdir,
+    fwupdplugin_incdir,
+  ],
+  dependencies : [
+    library_deps,
+  ],
+  link_with : [
+    fwupd,
+    fwupdplugin,
+  ],
+  link_args : fuzzing_link_args,
+  objects : eo,
+  install: true,
+  install_dir: fuzzing_install_dir,
+)
+
+custom_target('fu-dfu-firmware_fuzzer_seed_corpus',
+  input : [
+    '../src/fuzzing/firmware/dfu.dfu',
+  ],
+  output : 'fu-dfu-firmware_fuzzer_seed_corpus.zip',
+  command : [
+    'zip', '--junk-paths', '@OUTPUT@', '@INPUT@',
+  ],
+  install: true,
+  install_dir: fuzzing_install_dir,
+)

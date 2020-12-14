@@ -117,7 +117,8 @@ link_language = get_option('link_language')
 if link_language != 'c'
   add_languages(link_language)
 endif
-if get_option('fuzzing_engine').startswith('-fsanitize=fuzzer')
+fuzzing_link_args = get_option('fuzzing_link_args')
+if fuzzing_link_args.startswith('-fsanitize=fuzzer')
   add_project_arguments('-fsanitize=fuzzer-no-link', language : 'c')
 endif
 
@@ -204,9 +205,16 @@ endif
 mandir = join_paths(prefix, get_option('mandir'))
 localedir = join_paths(prefix, get_option('localedir'))
 
+# installed fuzzing targets
+fuzzing_install_dir = get_option('fuzzing_install_dir')
+if fuzzing_install_dir == ''
+  fuzzing_install_dir = installed_test_bindir
+endif
+
 diffcmd = find_program('diff')
-gio = dependency('gio-2.0', version : '>= 2.45.8')
-giounix = dependency('gio-unix-2.0', version : '>= 2.45.8', required: false)
+fuzzing_static_deps = get_option('fuzzing_static_deps')
+gio = dependency('gio-2.0', version : '>= 2.45.8', static : fuzzing_static_deps)
+giounix = dependency('gio-unix-2.0', version : '>= 2.45.8', required: false, static : fuzzing_static_deps)
 if giounix.found()
   conf.set('HAVE_GIO_UNIX', '1')
 endif
@@ -214,20 +222,20 @@ if gio.version().version_compare ('>= 2.55.0')
   conf.set('HAVE_GIO_2_55_0', '1')
 endif
 if build_standalone
-gmodule = dependency('gmodule-2.0')
+gmodule = dependency('gmodule-2.0', static : fuzzing_static_deps)
 if get_option('gudev')
   gudev = dependency('gudev-1.0', version : '>= 232')
   conf.set('HAVE_GUDEV', '1')
 else
   gudev = dependency('', required : false)
 endif
-libxmlb = dependency('xmlb', version : '>= 0.1.13', fallback : ['libxmlb', 'libxmlb_dep'])
+libxmlb = dependency('xmlb', version : '>= 0.1.13', fallback : ['libxmlb', 'libxmlb_dep'], static : fuzzing_static_deps)
 gusb = dependency('gusb', version : '>= 0.3.5', fallback : ['gusb', 'gusb_dep'])
 sqlite = dependency('sqlite3')
-libarchive = dependency('libarchive')
+libarchive = dependency('libarchive', static : fuzzing_static_deps)
 endif
-libjcat = dependency('jcat', version : '>= 0.1.0', fallback : ['libjcat', 'libjcat_dep'])
-libjsonglib = dependency('json-glib-1.0', version : '>= 1.1.1')
+libjsonglib = dependency('json-glib-1.0', version : '>= 1.1.1', fallback : ['json-glib', 'json_glib_dep'], static : fuzzing_static_deps)
+libjcat = dependency('jcat', version : '>= 0.1.0', fallback : ['libjcat', 'libjcat_dep'], static : fuzzing_static_deps)
 valgrind = dependency('valgrind', required: false)
 if get_option('curl')
   libcurl = dependency('libcurl', version : '>= 7.56.0')
@@ -254,7 +262,7 @@ if build_daemon
   endif
 endif
 libm = cc.find_library('m', required: false)
-libgcab = dependency('libgcab-1.0', version : '>= 1.0', fallback : ['gcab', 'gcab_dep'])
+libgcab = dependency('libgcab-1.0', version : '>= 1.0', fallback : ['gcab', 'gcab_dep'], static : fuzzing_static_deps)
 gcab = find_program('gcab', required : get_option('tests'))
 bashcomp = dependency('bash-completion', required: false)
 python3 = find_program('python3')
