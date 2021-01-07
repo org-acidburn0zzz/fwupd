@@ -114,7 +114,8 @@ meson "$BUILD" \
 	-Dplugin_redfish=false \
 	-Dplugin_synaptics=false \
 	-Dplugin_thunderbolt=false \
-	-Dplugin_uefi=false \
+	-Dplugin_uefi_capsule=false \
+	-Dplugin_uefi_pk=false \
 	-Dpolkit=false \
 	-Dsoup_session_compat=false \
 	-Dsystemd=false \
