@@ -278,6 +278,11 @@ if get_option('default_library') != 'static'
   endif
 endif
 
+if get_option('fuzzing_static_deps')
+  libicu = dependency('icu-io', static : true)
+  platform_deps += libicu
+endif
+
 if valgrind.found()
   conf.set('HAVE_VALGRIND', '1')
 endif
