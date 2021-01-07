@@ -69,7 +69,7 @@ meson "$BUILD" \
 	-Dagent=false \
 	-Dcurl=false \
 	-Db_lundef=false \
-	-Dbuild=standalone \
+	-Dbuild=fuzzing \
 	-Dconsolekit=false \
 	-Dfirmware-packager=false \
 	-Dfuzzing_install_dir=$OUT \
