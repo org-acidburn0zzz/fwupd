@@ -120,5 +120,3 @@ meson "$BUILD" \
 
 ninja -C "$BUILD"
 ninja -C "$BUILD" install
-
-patchelf --remove-needed libusb-1.0.so.0 $OUT/fu-dfu-firmware_fuzzer

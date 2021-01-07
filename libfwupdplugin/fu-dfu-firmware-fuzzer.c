@@ -13,10 +13,11 @@ LLVMFuzzerTestOneInput (const guint8 *data, gsize size)
 {
 	g_autoptr(FuFirmware) firmware = fu_dfu_firmware_new ();
 	g_autoptr(GBytes) fw = g_bytes_new (data, size);
-	fu_firmware_parse (firmware, fw,
-			   FWUPD_INSTALL_FLAG_NO_SEARCH |
-			   FWUPD_INSTALL_FLAG_IGNORE_VID_PID |
-			   FWUPD_INSTALL_FLAG_IGNORE_CHECKSUM,
-			   NULL);
+	G_GNUC_UNUSED gboolean ret;
+	ret = fu_firmware_parse (firmware, fw,
+				 FWUPD_INSTALL_FLAG_NO_SEARCH |
+				 FWUPD_INSTALL_FLAG_IGNORE_VID_PID |
+				 FWUPD_INSTALL_FLAG_IGNORE_CHECKSUM,
+				 NULL);
 	return 0;
 }
