@@ -3,9 +3,6 @@
 #
 # SPDX-License-Identifier: LGPL-2.1+
 
-# ensure up to date : FIXME remove
-git pull
-
 if [[ ! -v WORK ]]; then
 	echo "WORK unset, perhaps try WORK=/home/hughsie/Code/fwupd/build-oss-fuzz"
 	exit 1
