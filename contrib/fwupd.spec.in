@@ -189,6 +189,7 @@ can be flashed using flashrom. It is probably not required on servers.
 %meson \
 %if 0%{?enable_ci}
     --werror \
+    -Dci=true \
 %endif
     -Dgtkdoc=true \
 %if 0%{?enable_tests}

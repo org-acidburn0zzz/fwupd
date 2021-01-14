@@ -1,6 +1,7 @@
 option('build', type : 'combo', choices : ['all', 'standalone', 'library'], value : 'all', description : 'build type')
 option('agent', type : 'boolean', value : true, description : 'enable the fwupd agent')
 option('consolekit', type : 'boolean', value : true, description : 'enable ConsoleKit support')
+option('ci', type: 'boolean', value: false, description : 'enable extra debugging functionality specifically in continuous integration')
 option('firmware-packager', type : 'boolean', value : true, description : 'enable firmware-packager installation')
 option('gtkdoc', type : 'boolean', value : false, description : 'enable developer documentation')
 option('introspection', type : 'boolean', value : true, description : 'generate GObject Introspection data')

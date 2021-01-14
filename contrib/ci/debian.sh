@@ -76,6 +76,7 @@ dpkg -i $PACKAGES
 # run the installed tests
 if [ "$CI" = "true" ]; then
 	dpkg -i ../fwupd-tests*.deb
+	sed "s/\$FWUPD_ARGS/--verbose/" /lib/systemd/system/fwupd.service -i
 	service dbus restart
 	gnome-desktop-testing-runner fwupd
 	apt purge -y fwupd-tests

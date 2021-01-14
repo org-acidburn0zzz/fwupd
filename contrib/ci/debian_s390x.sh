@@ -16,6 +16,7 @@ cd build
 meson .. \
 	--cross-file s390x_cross.txt \
 	--werror \
+	-Dci=true \
 	-Dplugin_flashrom=false \
 	-Dplugin_uefi_capsule=false \
 	-Dplugin_dell=false \

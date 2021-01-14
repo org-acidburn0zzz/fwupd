@@ -68,6 +68,11 @@ if get_option('systemd') and build_daemon
   con2.set('dynamic_options', '\n'.join(dynamic_options))
   con2.set('motd_dir', motd_dir)
 
+  #enable --verbose in unit for CI purpose
+  if get_option('ci')
+    con2.set('ci_args', '--verbose')
+  endif
+
   # replace @bindir@
   configure_file(
     input : 'fwupd-offline-update.service.in',
