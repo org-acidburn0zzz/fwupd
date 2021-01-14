@@ -27,11 +27,29 @@ if [ -z "${SRC:-}" ]; then
 	SRC="."
 fi
 
+# build bits of xmlb
+if [ ! -d "${SRC}/libxmlb" ]; then
+	git clone https://github.com/hughsie/libxmlb.git
+	cd libxmlb
+	ln -s src libxmlb
+	cd ..
+fi
+
+# build bits of json-glib
+if [ ! -d "${SRC}/json-glib" ]; then
+	git clone https://gitlab.gnome.org/GNOME/json-glib.git
+fi
+
 # set up shared / static
-CFLAGS="$CFLAGS -I${SRC} -I${SRC}/libfwupd -I${SRC}/libfwupdplugin -I${SRC}/contrib/ci/oss-fuzz"
+CFLAGS="$CFLAGS -I${SRC}/contrib/ci/oss-fuzz "
+CFLAGS="$CFLAGS -I${SRC} -I${SRC}/libfwupd -I${SRC}/libfwupdplugin "
+CFLAGS="$CFLAGS -I${SRC}/libxmlb -I${SRC}/libxmlb/libxmlb "
+CFLAGS="$CFLAGS -I${SRC}/json-glib -I${SRC}/json-glib/json-glib -DJSON_COMPILATION"
+CFLAGS="$CFLAGS -DJSON_COMPILATION -DGETTEXT_PACKAGE"
 CFLAGS="$CFLAGS -Wno-deprecated-declarations"
 PREDEPS_LDFLAGS="-Wl,-Bdynamic -ldl -lm -lc -pthread -lrt -lpthread"
-DEPS="gmodule-2.0 glib-2.0 gio-unix-2.0 gobject-2.0 xmlb json-glib-1.0"
+DEPS="gmodule-2.0 glib-2.0 gio-unix-2.0 gobject-2.0"
+# json-glib-1.0"
 if [ -z "${LIB_FUZZING_ENGINE:-}" ]; then
 	BUILD_CFLAGS="$CFLAGS `pkg-config --cflags $DEPS`"
 	BUILD_LDFLAGS="$PREDEPS_LDFLAGS `pkg-config --libs $DEPS`"
@@ -39,9 +57,44 @@ else
 	BUILD_CFLAGS="$CFLAGS `pkg-config --static --cflags $DEPS`"
 	BUILD_LDFLAGS="$PREDEPS_LDFLAGS -Wl,-static `pkg-config --static --libs $DEPS`"
 fi
+BUILT_OBJECTS=""
+
+# json-glib
+libjsonglib_srcs="\
+	json-parser \
+"
+for obj in $libjsonglib_srcs; do
+	$CC $CFLAGS $BUILD_CFLAGS -c ${SRC}/json-glib/json-glib/$obj.c -o $WORK/$obj.o
+	BUILT_OBJECTS="$BUILT_OBJECTS $WORK/$obj.o"
+done
+
+# libxmlb
+libxmlb_srcs="\
+	xb-builder \
+	xb-builder-fixup \
+	xb-builder-node \
+	xb-builder-source \
+	xb-builder-source-ctx \
+	xb-common \
+	xb-machine \
+	xb-node \
+	xb-node-query \
+	xb-opcode \
+	xb-query \
+	xb-query-context \
+	xb-silo \
+	xb-silo-export \
+	xb-silo-query \
+	xb-stack \
+	xb-string \
+	xb-value-bindings \
+"
+for obj in $libxmlb_srcs; do
+	$CC $CFLAGS $BUILD_CFLAGS -c ${SRC}/json-glib/json-glib/$obj.c -o $WORK/$obj.o
+	BUILT_OBJECTS="$BUILT_OBJECTS $WORK/$obj.o"
+done
 
 # libfwupd shared built objects
-BUILT_OBJECTS=""
 libfwupd_srcs="\
 	fwupd-common \
 	fwupd-device \
