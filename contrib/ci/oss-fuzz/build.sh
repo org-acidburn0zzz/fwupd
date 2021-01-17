@@ -41,7 +41,7 @@ if [ ! -d "${SRC}/json-glib" ]; then
 fi
 
 # set up shared / static
-CFLAGS="$CFLAGS -I${SRC}/contrib/ci/oss-fuzz "
+CFLAGS="$CFLAGS -I${SRC}/contrib/ci/oss-fuzz -I${SRC}/contrib/ci/oss-fuzz/json-glib "
 CFLAGS="$CFLAGS -I${SRC} -I${SRC}/libfwupd -I${SRC}/libfwupdplugin "
 CFLAGS="$CFLAGS -I${SRC}/libxmlb -I${SRC}/libxmlb/libxmlb "
 CFLAGS="$CFLAGS -I${SRC}/json-glib -I${SRC}/json-glib/json-glib -DJSON_COMPILATION"
@@ -58,6 +58,25 @@ else
 	BUILD_LDFLAGS="$PREDEPS_LDFLAGS -Wl,-static `pkg-config --static --libs $DEPS`"
 fi
 BUILT_OBJECTS=""
+
+export PKG_CONFIG="`which pkg-config` --static"
+PREFIX=$WORK/prefix
+mkdir -p $PREFIX
+
+# Build json-glib
+pushd $SRC/json-glib
+meson \
+    --prefix=$PREFIX \
+    --libdir=lib \
+    --default-library=static \
+    -Dgtk_doc=disabled \
+    -Dintrospection=disabled \
+    _builddir
+ninja -C _builddir
+ninja -C _builddir install
+popd
+
+exit 1
 
 # json-glib
 libjsonglib_srcs="\
@@ -90,7 +109,7 @@ libxmlb_srcs="\
 	xb-value-bindings \
 "
 for obj in $libxmlb_srcs; do
-	$CC $CFLAGS $BUILD_CFLAGS -c ${SRC}/json-glib/json-glib/$obj.c -o $WORK/$obj.o
+	$CC $CFLAGS $BUILD_CFLAGS -c ${SRC}/libxmlb/libxmlb/$obj.c -o $WORK/$obj.o
 	BUILT_OBJECTS="$BUILT_OBJECTS $WORK/$obj.o"
 done
 
