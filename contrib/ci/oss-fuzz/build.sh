@@ -110,7 +110,7 @@ libfwupd_srcs="\
 	fwupd-release \
 "
 for obj in $libfwupd_srcs; do
-	$CC $CFLAGS ${BUILD_CFLAGS} -c ${SRC_FWUPD}/libfwupd/$obj.c -o ${WORK}/$obj.o
+	$CC -v $CFLAGS ${BUILD_CFLAGS} -c ${SRC_FWUPD}/libfwupd/$obj.c -o ${WORK}/$obj.o
 	BUILT_OBJECTS="${BUILT_OBJECTS} ${WORK}/$obj.o"
 done
 
@@ -126,13 +126,13 @@ libfwupdplugin_srcs="\
 	fu-volume \
 "
 for obj in $libfwupdplugin_srcs; do
-	$CC $CFLAGS ${BUILD_CFLAGS} -c ${SRC_FWUPD}/libfwupdplugin/$obj.c -o ${WORK}/$obj.o
+	$CC -v $CFLAGS ${BUILD_CFLAGS} -c ${SRC_FWUPD}/libfwupdplugin/$obj.c -o ${WORK}/$obj.o
 	BUILT_OBJECTS="${BUILT_OBJECTS} ${WORK}/$obj.o"
 done
 
 # dummy binary entrypoint
 if [ -z "${LIB_FUZZING_ENGINE:-}" ]; then
-	$CC $CFLAGS ${BUILD_CFLAGS} -c ${SRC_FWUPD}/libfwupdplugin/fu-fuzzer-main.c -o ${WORK}/fu-fuzzer-main.o
+	$CC -v $CFLAGS ${BUILD_CFLAGS} -c ${SRC_FWUPD}/libfwupdplugin/fu-fuzzer-main.c -o ${WORK}/fu-fuzzer-main.o
 	BUILT_OBJECTS="${BUILT_OBJECTS} ${WORK}/fu-fuzzer-main.o"
 else
 	BUILT_OBJECTS="${BUILT_OBJECTS} ${LIB_FUZZING_ENGINE}"
@@ -144,10 +144,10 @@ BUILD_CFLAGS_FUZZER_FIRMWARE="-Wno-implicit-function-declaration -Wno-int-conver
 # DFU
 fuzzer_type="dfu"
 fuzzer_name="fu-${fuzzer_type}-firmware"
-$CC $CFLAGS ${BUILD_CFLAGS} -c ${SRC_FWUPD}/libfwupdplugin/fu-${fuzzer_type}-firmware.c -o ${WORK}/$fuzzer_name.o
-$CC $CFLAGS ${BUILD_CFLAGS} ${BUILD_CFLAGS_FUZZER_FIRMWARE} \
+$CC -v $CFLAGS ${BUILD_CFLAGS} -c ${SRC_FWUPD}/libfwupdplugin/fu-${fuzzer_type}-firmware.c -o ${WORK}/$fuzzer_name.o
+$CC -v $CFLAGS ${BUILD_CFLAGS} ${BUILD_CFLAGS_FUZZER_FIRMWARE} \
 	-DGOBJECTTYPE=fu_${fuzzer_type}_firmware_new -c \
 	${SRC_FWUPD}/libfwupdplugin/fu-fuzzer-firmware.c -o ${WORK}/${fuzzer_name}_fuzzer.o
-$CXX $CXXFLAGS ${BUILT_OBJECTS} ${WORK}/$fuzzer_name.o ${WORK}/${fuzzer_name}_fuzzer.o \
+$CXX -v $CXXFLAGS ${BUILT_OBJECTS} ${WORK}/$fuzzer_name.o ${WORK}/${fuzzer_name}_fuzzer.o \
 	-o $OUT/${fuzzer_name}_fuzzer ${BUILD_LDFLAGS}
 zip --junk-paths $OUT/${fuzzer_name}_fuzzer_seed_corpus.zip ${SRC_FWUPD}/src/fuzzing/firmware/${fuzzer_type}*
