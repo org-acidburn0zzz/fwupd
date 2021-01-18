@@ -46,7 +46,6 @@ fi
 
 # set up shared / static
 CFLAGS="$CFLAGS -I${SRC}/contrib/ci/oss-fuzz"
-CFLAGS="$CFLAGS -I${SRC} -I${SRC}/libfwupd -I${SRC}/libfwupdplugin "
 CFLAGS="$CFLAGS -Wno-deprecated-declarations"
 PREDEPS_LDFLAGS="-Wl,-Bdynamic -ldl -lm -lc -pthread -lrt -lpthread"
 DEPS="gmodule-2.0 glib-2.0 gio-unix-2.0 gobject-2.0"
@@ -59,10 +58,7 @@ else
 	BUILD_LDFLAGS="$PREDEPS_LDFLAGS -Wl,-static `pkg-config --static --libs $DEPS`"
 fi
 BUILT_OBJECTS=""
-
 export PKG_CONFIG="`which pkg-config` --static"
-#PREFIX=${WORK}/prefix
-#mkdir -p $PREFIX
 
 # json-glib
 pushd ${SRC}/json-glib
@@ -109,6 +105,7 @@ for obj in $libfwupd_srcs; do
 done
 
 # libfwupdplugin shared built objects
+CFLAGS="$CFLAGS -I${SRC} -I${SRC}/libfwupd -I${SRC}/libfwupdplugin "
 libfwupdplugin_srcs="\
 	fu-common \
 	fu-common-version \

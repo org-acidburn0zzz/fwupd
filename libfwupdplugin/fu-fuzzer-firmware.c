@@ -19,11 +19,9 @@ LLVMFuzzerTestOneInput (const guint8 *data, gsize size)
 				 FWUPD_INSTALL_FLAG_IGNORE_VID_PID |
 				 FWUPD_INSTALL_FLAG_IGNORE_CHECKSUM,
 				 NULL);
-#if 0
 	if (ret) {
 		g_autofree gchar *str = fu_firmware_to_string (firmware);
 		g_print ("%s", str);
 	}
-#endif
 	return 0;
 }
