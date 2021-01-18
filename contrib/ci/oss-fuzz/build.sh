@@ -92,6 +92,7 @@ CFLAGS="$CFLAGS -I${WORK}/include/libxmlb-2 -I${WORK}/include/libxmlb-2/libxmlb"
 BUILD_LDFLAGS="${BUILD_LDFLAGS} ${WORK}/lib/libxmlb.a"
 
 # libfwupd shared built objects
+CFLAGS="$CFLAGS -I${SRC} -I${SRC}/libfwupd -I${SRC}/libfwupdplugin "
 libfwupd_srcs="\
 	fwupd-common \
 	fwupd-device \
@@ -105,7 +106,6 @@ for obj in $libfwupd_srcs; do
 done
 
 # libfwupdplugin shared built objects
-CFLAGS="$CFLAGS -I${SRC} -I${SRC}/libfwupd -I${SRC}/libfwupdplugin "
 libfwupdplugin_srcs="\
 	fu-common \
 	fu-common-version \
