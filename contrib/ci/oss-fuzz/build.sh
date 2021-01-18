@@ -48,6 +48,7 @@ fi
 if [ ! -d "${SRC_JSONGLIB}" ]; then
 	pushd ${SRC}
 	git clone https://gitlab.gnome.org/GNOME/json-glib.git
+	cd json-glib
 	git checkout c30c988ac3b0d9e7c332232e3c3969818749b239
 	popd
 fi
