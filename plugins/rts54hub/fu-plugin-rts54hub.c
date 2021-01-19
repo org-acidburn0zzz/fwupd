@@ -10,10 +10,13 @@
 #include "fu-hash.h"
 
 #include "fu-rts54hub-device.h"
+#include "fu-rts-usbhub-rtd21xx-device.h"
 
 void
 fu_plugin_init (FuPlugin *plugin)
 {
 	fu_plugin_set_build_hash (plugin, FU_BUILD_HASH);
 	fu_plugin_set_device_gtype (plugin, FU_TYPE_RTS54HUB_DEVICE);
+
+	g_type_ensure(FU_TYPE_RTS_USBHUB_RTD21XX_DEVICE);
 }

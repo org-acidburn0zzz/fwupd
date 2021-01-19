@@ -11,14 +11,6 @@
 #include "fu-chunk.h"
 #include "fu-rts54hub-device.h"
 
-struct _FuRts54HubDevice {
-	FuUsbDevice			 parent_instance;
-	gboolean			 fw_auth;
-	gboolean			 dual_bank;
-	gboolean			 running_on_flash;
-	guint8				 vendor_cmd;
-};
-
 G_DEFINE_TYPE (FuRts54HubDevice, fu_rts54hub_device, FU_TYPE_USB_DEVICE)
 
 #define FU_RTS54HUB_DEVICE_TIMEOUT			100	/* ms */
@@ -27,6 +19,10 @@ G_DEFINE_TYPE (FuRts54HubDevice, fu_rts54hub_device, FU_TYPE_USB_DEVICE)
 #define FU_RTS54HUB_DEVICE_TIMEOUT_AUTH			10000	/* ms */
 #define FU_RTS54HUB_DEVICE_BLOCK_SIZE			4096
 #define FU_RTS54HUB_DEVICE_STATUS_LEN			25
+
+#define _USBHUB_I2C_CONFIG_REQUEST 				0xF6
+#define _USBHUB_I2C_WRITE_REQUEST 				0xC6
+#define _USBHUB_I2C_READ_REQUEST 				0xD6
 
 typedef enum {
 	FU_RTS54HUB_VENDOR_CMD_NONE			= 0x00,
@@ -41,6 +37,75 @@ fu_rts54hub_device_to_string (FuDevice *device, guint idt, GString *str)
 	fu_common_string_append_kb (str, idt, "FwAuth", self->fw_auth);
 	fu_common_string_append_kb (str, idt, "DualBank", self->dual_bank);
 	fu_common_string_append_kb (str, idt, "RunningOnFlash", self->running_on_flash);
+}
+
+gboolean
+fu_rts54hub_device_i2c_config (FuRts54HubDevice *self, guint8 ucSlaveAddr, guint8 ucSublen, guint8 ucSpeed, GError **error)
+{
+	GUsbDevice *usb_device = fu_usb_device_get_dev (FU_USB_DEVICE (self));
+    guint16 usValue = 0, usIndex = 0x8080;
+    usValue = ((guint16)ucSlaveAddr << 8) | ucSublen;
+    usIndex += ucSpeed;
+	/* don't set something that's already set */
+	if (!g_usb_device_control_transfer (usb_device,
+					    G_USB_DEVICE_DIRECTION_HOST_TO_DEVICE,
+					    G_USB_DEVICE_REQUEST_TYPE_VENDOR,
+					    G_USB_DEVICE_RECIPIENT_DEVICE,
+					    _USBHUB_I2C_CONFIG_REQUEST,		/* request */
+					    usValue,		/* value */
+					    usIndex,		/* idx */
+					    NULL, 0,		/* data */
+					    NULL,		/* actual */
+					    FU_RTS54HUB_DEVICE_TIMEOUT,
+					    NULL, error)) {
+		g_prefix_error (error, "failed to issue i2c Conf cmd 0x%02x: ", ucSlaveAddr);
+		return FALSE;
+	}
+	return TRUE;
+}
+
+gboolean
+fu_rts54hub_device_i2c_write (FuRts54HubDevice *self,
+				guint32 sub_addr, guint8 *data, gsize datasz,
+				GError **error)
+{
+	GUsbDevice *usb_device = fu_usb_device_get_dev (FU_USB_DEVICE (self));
+	if (!g_usb_device_control_transfer (usb_device,
+					    G_USB_DEVICE_DIRECTION_HOST_TO_DEVICE,
+					    G_USB_DEVICE_REQUEST_TYPE_VENDOR,
+					    G_USB_DEVICE_RECIPIENT_DEVICE,
+					    _USBHUB_I2C_WRITE_REQUEST,  // request
+					    sub_addr, // value
+					    0x0000, // idx
+					    data, datasz, // data
+					    NULL,
+					    FU_RTS54HUB_DEVICE_TIMEOUT,
+					    NULL, error)) {
+		g_prefix_error (error, "failed to write I2C");
+		return FALSE;
+	}
+	return TRUE;
+}
+
+gboolean
+fu_rts54hub_device_i2c_read (FuRts54HubDevice *self,
+			       guint32 sub_addr, guint8 *data,
+			       gsize datasz, GError **error)
+{
+	GUsbDevice *usb_device = fu_usb_device_get_dev (FU_USB_DEVICE (self));
+	if (!g_usb_device_control_transfer (usb_device,
+					    G_USB_DEVICE_DIRECTION_DEVICE_TO_HOST,
+					    G_USB_DEVICE_REQUEST_TYPE_VENDOR,
+					    G_USB_DEVICE_RECIPIENT_DEVICE,
+					    _USBHUB_I2C_WRITE_REQUEST, 0x0000,
+					    sub_addr,
+					    data, datasz, NULL,
+					    FU_RTS54HUB_DEVICE_TIMEOUT,
+					    NULL, error)) {
+		g_prefix_error (error, "failed to read I2C: ");
+		return FALSE;
+	}
+	return TRUE;
 }
 
 static gboolean
@@ -195,7 +260,7 @@ fu_rts54hub_device_erase_flash (FuRts54HubDevice *self,
 	return TRUE;
 }
 
-static gboolean
+gboolean
 fu_rts54hub_device_vendor_cmd (FuRts54HubDevice *self, guint8 value, GError **error)
 {
 	GUsbDevice *usb_device = fu_usb_device_get_dev (FU_USB_DEVICE (self));

@@ -11,6 +11,7 @@ shared_module('fu_plugin_rts54hub',
   sources : [
     'fu-rts54hub-device.c',
     'fu-plugin-rts54hub.c',
+    'fu-rts-usbhub-rtd21xx-device.c',
   ],
   include_directories : [
     root_incdir,
