@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2021 Realtek Corporation
- * Copyright (C) 2019 Richard Hughes <richard@hughsie.com>
+ * Copyright (C) 2021 Ricky Wu <ricky_wu@realtek.com> <spring1527@gmail.com>
  *
  * SPDX-License-Identifier: LGPL-2.1+
  */
@@ -18,6 +18,7 @@ struct _FuRtsUsbhubRtd21xxDevice
 	guint8			target_addr;
 	guint8			i2c_speed;
 	guint8			register_addr_len;
+	guint8			slave_addr;
 };
 
 G_DEFINE_TYPE (FuRtsUsbhubRtd21xxDevice, fu_rts_usbhub_rtd21xx_device, FU_TYPE_DEVICE)
@@ -49,15 +50,28 @@ typedef enum {
 	ISP_CMD_FW_UPDATE_RESET		= 0x08,
 } IspCmd;
 
-guint8 g_ucSlaveAddr = 0xFF;
-
 static void
 fu_rts54hub_module_to_string (FuDevice *module, guint idt, GString *str)
 {
-	FuRtsUsbhubRtd21xxDevice *self = FU_RTS_USBHUB_RTD21XX_DEVICE (module);
-	fu_common_string_append_kx (str, idt, "TargetAddr", self->target_addr);
-	fu_common_string_append_kx (str, idt, "I2cSpeed", self->i2c_speed);
-	fu_common_string_append_kx (str, idt, "RegisterAddrLen", self->register_addr_len);
+    FuRtsUsbhubRtd21xxDevice *self = FU_RTS_USBHUB_RTD21XX_DEVICE (module);
+    fu_common_string_append_kx (str, idt, "TargetAddr", self->target_addr);
+    fu_common_string_append_kx (str, idt, "I2cSpeed", self->i2c_speed);
+    fu_common_string_append_kx (str, idt, "RegisterAddrLen", self->register_addr_len);
+    fu_common_string_append_kx (str, idt, "SlaveAddr", self->slave_addr);
+}
+
+static FuRts54HubDevice *
+fu_rts54hub_device_get_parent (FuRtsUsbhubRtd21xxDevice *self, GError **error)
+{
+    FuDevice *parent = fu_device_get_parent (FU_DEVICE (self));
+    if (parent == NULL) {
+        g_set_error_literal (error,
+                     FWUPD_ERROR,
+                     FWUPD_ERROR_INTERNAL,
+                     "no parent set");
+        return NULL;
+    }
+    return FU_RTS54HUB_DEVICE (parent);
 }
 
 static gboolean
@@ -84,7 +98,7 @@ fu_rts54hub_module_set_quirk_kv (FuDevice *device,
 	/* load i2c speed from quirks */
 	if (g_strcmp0 (key, "Rts54I2cSpeed") == 0) {
 		guint64 tmp = fu_common_strtoull (value);
-		if (tmp < I2C_BUS_SPEED_800K) {
+		if (tmp < FU_RTS54HUB_I2C_SPEED_LAST) {
 			self->i2c_speed = tmp;
 			return TRUE;
 		}
@@ -147,29 +161,26 @@ fu_rts54hub_module_close (FuDevice *device, GError **error)
 }
 
 static gboolean
-fu_rts_usbhub_device_i2c_write (FuRts54HubDevice *self,
+fu_rts_usbhub_device_i2c_write (FuRtsUsbhubRtd21xxDevice *self,
 				guint8 slave_addr, guint8 sub_addr,
 				guint8 *data, gsize datasz,
 				GError **error)
 {
+    FuRts54HubDevice *parent;
+    parent = fu_rts54hub_device_get_parent(self, error);
+    if (parent == NULL)
+        return FALSE;
 
-    if(self->vendor_cmd == 0)
-    {
-        if(!fu_rts54hub_device_vendor_cmd(self, 1, error))
-        {
+    if (!fu_rts54hub_device_vendor_cmd(parent, 1, error))
+        return FALSE;
+
+    if (slave_addr != self->slave_addr) {
+        if (!fu_rts54hub_device_i2c_config(parent, slave_addr, 1, FU_RTS54HUB_I2C_SPEED_200K, error))
             return FALSE;
-        }
-    }
-    if(slave_addr != g_ucSlaveAddr)
-    {
-        if(!fu_rts54hub_device_i2c_config(self, slave_addr, 1, I2C_BUS_SPEED_200K, error))
-        {
-            return FALSE;
-        }
-        g_ucSlaveAddr = slave_addr;    
+        self->slave_addr = slave_addr;
     }
     
-	if (!fu_rts54hub_device_i2c_write (self, sub_addr, data, datasz, error)) {
+	if (!fu_rts54hub_device_i2c_write (parent, sub_addr, data, datasz, error)) {
 		g_prefix_error (error,
 				"failed to write I2C @0x%02x:%02x: ",
 				slave_addr, sub_addr);
@@ -180,35 +191,30 @@ fu_rts_usbhub_device_i2c_write (FuRts54HubDevice *self,
 }
 
 static gboolean
-fu_rts_usbhub_device_i2c_read(FuRts54HubDevice *self,
+fu_rts_usbhub_device_i2c_read (FuRtsUsbhubRtd21xxDevice *self,
 			       guint8 slave_addr, guint8 sub_addr,
 			       guint8 *data, gsize datasz,
 			       GError **error)
 {
-	
-    if(self->vendor_cmd == 0)
-    {
-        if(!fu_rts54hub_device_vendor_cmd(self, 1, error))
-        {
+    FuRts54HubDevice *parent;
+    parent = fu_rts54hub_device_get_parent(self, error);
+    if (parent == NULL)
+        return FALSE;
+
+    if (!fu_rts54hub_device_vendor_cmd(parent, 1, error))
+        return FALSE;
+
+    if (slave_addr != self->slave_addr) {
+        if (!fu_rts54hub_device_i2c_config(parent, slave_addr, 1, FU_RTS54HUB_I2C_SPEED_200K, error))
             return FALSE;
-        }
+        self->slave_addr = slave_addr;
     }
     
-    if(slave_addr != g_ucSlaveAddr)
-    {
-        if(!fu_rts54hub_device_i2c_config(self, slave_addr, 1, I2C_BUS_SPEED_200K, error))
-        {
-            return FALSE;
-        }
-        g_ucSlaveAddr = slave_addr;    
-    }
-    
-	if (!fu_rts54hub_device_i2c_read(self, sub_addr, data, datasz, error)) {
+	if (!fu_rts54hub_device_i2c_read(parent, sub_addr, data, datasz, error)) {
 		g_prefix_error (error, "failed to read I2C: ");
 		return FALSE;
 	}
 	return TRUE;
-
 }
 
 static gboolean
@@ -216,9 +222,8 @@ fu_rts_usbhub_device_rtd21xx_read_status_raw (FuRtsUsbhubRtd21xxDevice *self,
 					      guint8 *status,
 					      GError **error)
 {
-	FuRts54HubDevice *parent = FU_RTS54HUB_DEVICE (fu_device_get_parent (FU_DEVICE (self)));
 	guint8 buf[] = { 0x00 };
-	if (!fu_rts_usbhub_device_i2c_read (parent,
+	if (!fu_rts_usbhub_device_i2c_read (self,
 					    UC_FOREGROUND_SLAVE_ADDR,
 					    UC_FOREGROUND_STATUS,
 					    buf, sizeof(buf),
@@ -262,12 +267,11 @@ static gboolean
 fu_rts_usbhub_rtd21xx_ensure_version_unlocked (FuRtsUsbhubRtd21xxDevice *self,
 					      GError **error)
 {
-	FuRts54HubDevice *parent = FU_RTS54HUB_DEVICE (fu_device_get_parent (FU_DEVICE (self)));
-	guint8 buf_rep[7] = { 0x00 };
-	guint8 buf_req[] = { ISP_CMD_GET_FW_INFO };
-	g_autofree gchar *version = NULL;
+    guint8 buf_rep[7] = { 0x00 };
+    guint8 buf_req[] = { ISP_CMD_GET_FW_INFO };
+    g_autofree gchar *version = NULL;
 
-	if (!fu_rts_usbhub_device_i2c_write (parent,
+    if (!fu_rts_usbhub_device_i2c_write (self,
 					     UC_FOREGROUND_SLAVE_ADDR,
 					     UC_FOREGROUND_OPCODE,
 					     buf_req, sizeof(buf_req),
@@ -277,8 +281,8 @@ fu_rts_usbhub_rtd21xx_ensure_version_unlocked (FuRtsUsbhubRtd21xxDevice *self,
 	}
 
 	/* wait for device ready */
-	g_usleep (300000);
-	if (!fu_rts_usbhub_device_i2c_read (parent,
+    g_usleep (300000);
+	if (!fu_rts_usbhub_device_i2c_read (self,
 					    UC_FOREGROUND_SLAVE_ADDR,
 					    0x00,
 					    buf_rep, sizeof(buf_rep),
@@ -296,9 +300,8 @@ fu_rts_usbhub_rtd21xx_ensure_version_unlocked (FuRtsUsbhubRtd21xxDevice *self,
 static gboolean
 fu_rts_usbhub_device_rtd21xx_detach_raw (FuRtsUsbhubRtd21xxDevice *self, GError **error)
 {
-    FuRts54HubDevice *parent = FU_RTS54HUB_DEVICE (fu_device_get_parent (FU_DEVICE (self)));
-	guint8 buf[] = { 0x03 };
-	if (!fu_rts_usbhub_device_i2c_write (parent, 0x6A, 0x31, buf, sizeof(buf), error)) {
+    guint8 buf[] = { 0x03 };
+	if (!fu_rts_usbhub_device_i2c_write (self, 0x6A, 0x31, buf, sizeof(buf), error)) {
 		g_prefix_error (error, "failed to detach: ");
 		return FALSE;
 	}
@@ -310,14 +313,14 @@ fu_rts_usbhub_device_rtd21xx_detach_cb (FuDevice *device,
 					gpointer user_data,
 					GError **error)
 {
-	FuRtsUsbhubRtd21xxDevice *self = FU_RTS_USBHUB_RTD21XX_DEVICE (device);
-	guint8 status = 0xfe;
-	if (!fu_rts_usbhub_device_rtd21xx_detach_raw (self, error))
-		return FALSE;
-	if (!fu_rts_usbhub_device_rtd21xx_read_status_raw (self, &status, error))
-		return FALSE;
-	if (status != ISP_STATUS_IDLE_SUCCESS) {
-		g_set_error (error,
+    FuRtsUsbhubRtd21xxDevice *self = FU_RTS_USBHUB_RTD21XX_DEVICE (device);
+    guint8 status = 0xfe;
+    if (!fu_rts_usbhub_device_rtd21xx_detach_raw (self, error))
+        return FALSE;
+    if (!fu_rts_usbhub_device_rtd21xx_read_status_raw (self, &status, error))
+        return FALSE;
+    if (status != ISP_STATUS_IDLE_SUCCESS) {
+        g_set_error (error,
 			     FWUPD_ERROR,
 			     FWUPD_ERROR_INTERNAL,
 			     "detach status was 0x%02x", status);
@@ -332,8 +335,7 @@ fu_rts_usbhub_rtd21xx_device_write_firmware (FuDevice *device,
 					     FwupdInstallFlags flags,
 					     GError **error)
 {
-    FuRts54HubDevice *parent = FU_RTS54HUB_DEVICE (fu_device_get_parent (device));
-	FuRtsUsbhubRtd21xxDevice *self = FU_RTS_USBHUB_RTD21XX_DEVICE (device);
+    FuRtsUsbhubRtd21xxDevice *self = FU_RTS_USBHUB_RTD21XX_DEVICE (device);
 	const guint8 *fwbuf;
 	gsize fwbufsz = 0;
 	guint32 project_addr;
@@ -345,7 +347,7 @@ fu_rts_usbhub_rtd21xx_device_write_firmware (FuDevice *device,
 	g_autoptr(GPtrArray) chunks = NULL;
 
 	/* open device */
-	locker = fu_device_locker_new (parent, error);
+	locker = fu_device_locker_new (self, error);
 	if (locker == NULL)
 		return FALSE;
 
@@ -359,7 +361,7 @@ fu_rts_usbhub_rtd21xx_device_write_firmware (FuDevice *device,
 	write_buf[0] = ISP_CMD_ENTER_FW_UPDATE;
 	write_buf[1] = 0x01;
 	fu_device_set_status (device, FWUPD_STATUS_DEVICE_BUSY);
-	if (!fu_rts_usbhub_device_i2c_write (parent,
+	if (!fu_rts_usbhub_device_i2c_write (self,
 					     UC_FOREGROUND_SLAVE_ADDR,
 					     UC_FOREGROUND_OPCODE,
 					     write_buf,
@@ -374,7 +376,7 @@ fu_rts_usbhub_rtd21xx_device_write_firmware (FuDevice *device,
 	/* get project ID address */
 	write_buf[0] = ISP_CMD_GET_PROJECT_ID_ADDR;
 	fu_device_set_status (device, FWUPD_STATUS_DEVICE_READ);
-	if (!fu_rts_usbhub_device_i2c_write (parent,
+	if (!fu_rts_usbhub_device_i2c_write (self,
 					     UC_FOREGROUND_SLAVE_ADDR,
 					     UC_FOREGROUND_OPCODE,
 					     write_buf, 1,
@@ -385,7 +387,7 @@ fu_rts_usbhub_rtd21xx_device_write_firmware (FuDevice *device,
 
 	/* read back 6 bytes data */
 	g_usleep (I2C_DELAY_AFTER_SEND * 40);
-	if (!fu_rts_usbhub_device_i2c_read (parent,
+	if (!fu_rts_usbhub_device_i2c_read (self,
 					    UC_FOREGROUND_SLAVE_ADDR,
 					    UC_FOREGROUND_STATUS,
 					    read_buf, 6,
@@ -409,7 +411,7 @@ fu_rts_usbhub_rtd21xx_device_write_firmware (FuDevice *device,
 		return FALSE;
 	}
 	fu_device_set_status (device, FWUPD_STATUS_DEVICE_BUSY);
-	if (!fu_rts_usbhub_device_i2c_write (parent,
+	if (!fu_rts_usbhub_device_i2c_write (self,
 					     UC_FOREGROUND_SLAVE_ADDR,
 					     UC_FOREGROUND_OPCODE,
 					     write_buf,
@@ -424,7 +426,7 @@ fu_rts_usbhub_rtd21xx_device_write_firmware (FuDevice *device,
 	/* background FW update start command */
 	write_buf[0] = ISP_CMD_FW_UPDATE_START;
 	fu_common_write_uint16 (write_buf + 1, ISP_DATA_BLOCKSIZE, G_BIG_ENDIAN);
-	if (!fu_rts_usbhub_device_i2c_write (parent,
+	if (!fu_rts_usbhub_device_i2c_write (self,
 					     UC_FOREGROUND_SLAVE_ADDR,
 					     UC_FOREGROUND_OPCODE,
 					     write_buf, 3,
@@ -443,7 +445,7 @@ fu_rts_usbhub_rtd21xx_device_write_firmware (FuDevice *device,
 		FuChunk *chk = g_ptr_array_index (chunks, i);
 		if (!fu_rts_usbhub_device_rtd21xx_read_status (self, NULL, error))
 			return FALSE;
-		if (!fu_rts_usbhub_device_i2c_write (parent,
+		if (!fu_rts_usbhub_device_i2c_write (self,
 						     UC_FOREGROUND_SLAVE_ADDR,
 						     UC_FOREGROUND_ISP_DATA_OPCODE,
 						     (guint8 *) chk->data,
@@ -462,7 +464,7 @@ fu_rts_usbhub_rtd21xx_device_write_firmware (FuDevice *device,
 	if (!fu_rts_usbhub_device_rtd21xx_read_status (self, NULL, error))
 		return FALSE;
 	write_buf[0] = ISP_CMD_FW_UPDATE_ISP_DONE;
-	if (!fu_rts_usbhub_device_i2c_write (parent,
+	if (!fu_rts_usbhub_device_i2c_write (self,
 					     UC_FOREGROUND_SLAVE_ADDR,
 					     UC_FOREGROUND_OPCODE,
 					     write_buf, 1,
@@ -477,7 +479,7 @@ fu_rts_usbhub_rtd21xx_device_write_firmware (FuDevice *device,
 	if (!fu_rts_usbhub_device_rtd21xx_read_status (self, NULL, error))
 		return FALSE;
 	write_buf[0] = ISP_CMD_FW_UPDATE_EXIT;
-	if (!fu_rts_usbhub_device_i2c_write (parent,
+	if (!fu_rts_usbhub_device_i2c_write (self,
 					     UC_FOREGROUND_SLAVE_ADDR,
 					     UC_FOREGROUND_OPCODE,
 					     write_buf, 1,
@@ -497,15 +499,15 @@ fu_rts_usbhub_rtd21xx_device_write_firmware (FuDevice *device,
 static void
 fu_rts_usbhub_rtd21xx_device_init (FuRtsUsbhubRtd21xxDevice *self)
 {
-	//fu_device_add_icon (FU_DEVICE (self), "video-display");
-	//fu_device_set_protocol (FU_DEVICE (self), "com.realtek.rts54hub.i2c");
-	//fu_device_add_flag (FU_DEVICE (self), FWUPD_DEVICE_FLAG_UPDATABLE);
-	//fu_device_add_flag (FU_DEVICE (self), FWUPD_DEVICE_FLAG_NO_GUID_MATCHING);
-	//fu_device_add_flag (FU_DEVICE (self), FWUPD_DEVICE_FLAG_DUAL_IMAGE);
-	//fu_device_set_version_format (FU_DEVICE (self), FWUPD_VERSION_FORMAT_PAIR);
-	//fu_device_set_install_duration (FU_DEVICE (self), 100); /* seconds */
-	//fu_device_set_logical_id (FU_DEVICE (self), "I2C");
-	//fu_device_retry_set_delay (FU_DEVICE (self), 30); /* ms */
+	fu_device_add_icon (FU_DEVICE (self), "video-display");
+	fu_device_set_protocol (FU_DEVICE (self), "com.realtek.rts54hub.i2c");
+	fu_device_add_flag (FU_DEVICE (self), FWUPD_DEVICE_FLAG_UPDATABLE);
+	fu_device_add_flag (FU_DEVICE (self), FWUPD_DEVICE_FLAG_NO_GUID_MATCHING);
+	fu_device_add_flag (FU_DEVICE (self), FWUPD_DEVICE_FLAG_DUAL_IMAGE);
+	fu_device_set_version_format (FU_DEVICE (self), FWUPD_VERSION_FORMAT_PAIR);
+	fu_device_set_install_duration (FU_DEVICE (self), 100); /* seconds */
+	fu_device_set_logical_id (FU_DEVICE (self), "I2C");
+	fu_device_retry_set_delay (FU_DEVICE (self), 30); /* ms */
 }
 
 static void

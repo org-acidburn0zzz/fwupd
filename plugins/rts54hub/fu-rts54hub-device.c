@@ -11,6 +11,14 @@
 #include "fu-chunk.h"
 #include "fu-rts54hub-device.h"
 
+struct _FuRts54HubDevice {
+    FuUsbDevice          parent_instance;
+    gboolean             fw_auth;
+    gboolean             dual_bank;
+    gboolean             running_on_flash;
+    guint8               vendor_cmd;
+};
+
 G_DEFINE_TYPE (FuRts54HubDevice, fu_rts54hub_device, FU_TYPE_USB_DEVICE)
 
 #define FU_RTS54HUB_DEVICE_TIMEOUT			100	/* ms */
@@ -40,7 +48,7 @@ fu_rts54hub_device_to_string (FuDevice *device, guint idt, GString *str)
 }
 
 gboolean
-fu_rts54hub_device_i2c_config (FuRts54HubDevice *self, guint8 ucSlaveAddr, guint8 ucSublen, guint8 ucSpeed, GError **error)
+fu_rts54hub_device_i2c_config (FuRts54HubDevice *self, guint8 ucSlaveAddr, guint8 ucSublen, FuRts54HubI2cSpeed ucSpeed, GError **error)
 {
 	GUsbDevice *usb_device = fu_usb_device_get_dev (FU_USB_DEVICE (self));
     guint16 usValue = 0, usIndex = 0x8080;
