@@ -81,7 +81,7 @@ fu_rts54hub_module_set_quirk_kv (FuDevice *device,
 				 GError **error)
 {
 	FuRtsUsbhubRtd21xxDevice *self = FU_RTS_USBHUB_RTD21XX_DEVICE (device);
-	/* load target address from quirks */
+    /* load target address from quirks */
 	if (g_strcmp0 (key, "Rts54TargetAddr") == 0) {
 		guint64 tmp = fu_common_strtoull (value);
 		if (tmp <= 0xff) {
@@ -272,29 +272,48 @@ fu_rts_usbhub_rtd21xx_ensure_version_unlocked (FuRtsUsbhubRtd21xxDevice *self,
     g_autofree gchar *version = NULL;
 
     if (!fu_rts_usbhub_device_i2c_write (self,
-					     UC_FOREGROUND_SLAVE_ADDR,
-					     UC_FOREGROUND_OPCODE,
-					     buf_req, sizeof(buf_req),
-					     error)) {
-		g_prefix_error (error, "failed to get version number: ");
-		return FALSE;
-	}
-
-	/* wait for device ready */
-    g_usleep (300000);
-	if (!fu_rts_usbhub_device_i2c_read (self,
-					    UC_FOREGROUND_SLAVE_ADDR,
-					    0x00,
-					    buf_rep, sizeof(buf_rep),
+                        UC_FOREGROUND_SLAVE_ADDR,
+					    UC_FOREGROUND_OPCODE,
+					    buf_req, sizeof(buf_req),
 					    error)) {
 		g_prefix_error (error, "failed to get version number: ");
 		return FALSE;
 	}
 
-	/* set version */
-	version = g_strdup_printf ("%u.%u", buf_rep[1], buf_rep[2]);
-	fu_device_set_version (FU_DEVICE (self), version);
-	return TRUE;
+    /* wait for device ready */
+    g_usleep (300000);
+    if (!fu_rts_usbhub_device_i2c_read (self,
+					    UC_FOREGROUND_SLAVE_ADDR,
+					    0x00,
+					    buf_rep, sizeof(buf_rep),
+					    error)) {
+        g_prefix_error (error, "failed to get version number: ");
+        return FALSE;
+    }
+
+    /* set version */
+    version = g_strdup_printf ("%u.%u", buf_rep[1], buf_rep[2]);
+    fu_device_set_version (FU_DEVICE (self), version);
+    return TRUE;
+}
+
+static gboolean
+fu_rts54hub_module_setup (FuDevice *device, GError **error)
+{
+    FuRtsUsbhubRtd21xxDevice *self = FU_RTS_USBHUB_RTD21XX_DEVICE (device);
+    g_autoptr(FuDeviceLocker) locker = NULL;
+    /* get version */
+    locker = fu_device_locker_new_full (device,
+                        (FuDeviceLockerFunc) fu_device_detach,
+                        (FuDeviceLockerFunc) fu_device_attach,
+                        error);
+    if (locker == NULL)
+        return FALSE;
+    if (!fu_rts_usbhub_rtd21xx_ensure_version_unlocked (self, error))
+        return FALSE;
+
+    /* success */
+    return TRUE;
 }
 
 static gboolean
@@ -513,12 +532,13 @@ fu_rts_usbhub_rtd21xx_device_init (FuRtsUsbhubRtd21xxDevice *self)
 static void
 fu_rts_usbhub_rtd21xx_device_class_init (FuRtsUsbhubRtd21xxDeviceClass *klass)
 {
-	FuDeviceClass *klass_device = FU_DEVICE_CLASS (klass);	
-	klass_device->write_firmware = fu_rts_usbhub_rtd21xx_device_write_firmware;
-	klass_device->to_string = fu_rts54hub_module_to_string;
-	klass_device->set_quirk_kv = fu_rts54hub_module_set_quirk_kv;
-	klass_device->open = fu_rts54hub_module_open;
-	klass_device->close = fu_rts54hub_module_close;
+    FuDeviceClass *klass_device = FU_DEVICE_CLASS (klass);
+    klass_device->setup = fu_rts54hub_module_setup;
+    klass_device->write_firmware = fu_rts_usbhub_rtd21xx_device_write_firmware;
+    klass_device->to_string = fu_rts54hub_module_to_string;
+    klass_device->set_quirk_kv = fu_rts54hub_module_set_quirk_kv;
+    klass_device->open = fu_rts54hub_module_open;
+    klass_device->close = fu_rts54hub_module_close;
 }
 
 FuRtsUsbhubRtd21xxDevice *
