@@ -1156,6 +1156,33 @@ fu_device_flags_func (void)
 }
 
 static void
+fu_device_children_func (void)
+{
+	gboolean ret;
+	g_autoptr(FuDevice) child = fu_device_new ();
+	g_autoptr(FuDevice) parent = fu_device_new ();
+	g_autoptr(GError) error = NULL;
+
+	fu_device_set_physical_id (child, "dummy");
+	fu_device_set_physical_id (parent, "dummy");
+
+	/* set up family */
+	fu_device_add_child (parent, child);
+
+	/* set an instance ID that will be converted to a GUID when the parent
+	 * calls ->setup */
+	fu_device_add_instance_id (child, "foo");
+	g_assert_false (fu_device_has_guid (child, "b84ed8ed-a7b1-502f-83f6-90132e68adef"));
+
+	/* setup parent, which also calls setup on child too (and thus also
+	 * converts the instance ID to a GUID) */
+	ret = fu_device_setup (parent, &error);
+	g_assert_no_error (error);
+	g_assert_true (ret);
+	g_assert_true (fu_device_has_guid (child, "b84ed8ed-a7b1-502f-83f6-90132e68adef"));
+}
+
+static void
 fu_device_parent_func (void)
 {
 	g_autoptr(FuDevice) child = fu_device_new ();
@@ -2193,6 +2220,7 @@ main (int argc, char **argv)
 	g_test_add_func ("/fwupd/device", fu_device_func);
 	g_test_add_func ("/fwupd/device{flags}", fu_device_flags_func);
 	g_test_add_func ("/fwupd/device{parent}", fu_device_parent_func);
+	g_test_add_func ("/fwupd/device{children}", fu_device_children_func);
 	g_test_add_func ("/fwupd/device{incorporate}", fu_device_incorporate_func);
 	if (g_test_slow ())
 		g_test_add_func ("/fwupd/device{poll}", fu_device_poll_func);
