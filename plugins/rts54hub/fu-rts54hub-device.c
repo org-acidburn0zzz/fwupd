@@ -21,7 +21,7 @@ struct _FuRts54HubDevice {
 
 G_DEFINE_TYPE (FuRts54HubDevice, fu_rts54hub_device, FU_TYPE_USB_DEVICE)
 
-#define FU_RTS54HUB_DEVICE_TIMEOUT			100	/* ms */
+#define FU_RTS54HUB_DEVICE_TIMEOUT			1000	/* ms */
 #define FU_RTS54HUB_DEVICE_TIMEOUT_RW			1000	/* ms */
 #define FU_RTS54HUB_DEVICE_TIMEOUT_ERASE		5000	/* ms */
 #define FU_RTS54HUB_DEVICE_TIMEOUT_AUTH			10000	/* ms */
@@ -78,7 +78,7 @@ fu_rts54hub_device_i2c_write (FuRts54HubDevice *self,
 				GError **error)
 {
 	GUsbDevice *usb_device = fu_usb_device_get_dev (FU_USB_DEVICE (self));
-	if (!g_usb_device_control_transfer (usb_device,
+    if (!g_usb_device_control_transfer (usb_device,
 					    G_USB_DEVICE_DIRECTION_HOST_TO_DEVICE,
 					    G_USB_DEVICE_REQUEST_TYPE_VENDOR,
 					    G_USB_DEVICE_RECIPIENT_DEVICE,
@@ -105,7 +105,7 @@ fu_rts54hub_device_i2c_read (FuRts54HubDevice *self,
 					    G_USB_DEVICE_DIRECTION_DEVICE_TO_HOST,
 					    G_USB_DEVICE_REQUEST_TYPE_VENDOR,
 					    G_USB_DEVICE_RECIPIENT_DEVICE,
-					    _USBHUB_I2C_WRITE_REQUEST, 0x0000,
+					    _USBHUB_I2C_READ_REQUEST, 0x0000,
 					    sub_addr,
 					    data, datasz, NULL,
 					    FU_RTS54HUB_DEVICE_TIMEOUT,
